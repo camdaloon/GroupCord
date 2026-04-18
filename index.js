@@ -60,15 +60,48 @@ app.post("/groupme", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  const guild = client.guilds.cache.get(GUILD_ID);
-  if (!guild) return res.sendStatus(200);
+  const text = data.text.toUpperCase();
 
-  const channel = guild.channels.cache.find(
-    c => c.name === CHANNEL_NAME
-  );
+  let foundBill = Object.keys(votes)[Object.keys(votes).length - 1];
+  if (!foundBill) return res.sendStatus(200);
 
-  if (channel) {
-    channel.send(`[GroupMe] ${data.name}: ${data.text}`);
+  if (text.includes("YES")) {
+    votes[foundBill].yes.add(data.name);
+  }
+
+  if (text.includes("NO")) {
+    votes[foundBill].no.add(data.name);
+  }
+
+  const guilds = client.guilds.cache;
+
+  const resultChannelSend = (msg) => {
+    guilds.forEach(g => {
+      const channel = g.channels.cache.find(c => c.name === "voting");
+      if (channel) channel.send(msg);
+    });
+  };
+
+  const yesCount = votes[foundBill].yes.size;
+  const noCount = votes[foundBill].no.size;
+
+  if (yesCount + noCount >= 3) {
+    const result = yesCount > noCount ? "PASSED" : "FAILED";
+
+    resultChannelSend(
+      `📜 ${foundBill} RESULT: ${result}\nYES: ${yesCount} | NO: ${noCount}`
+    );
+
+    await fetch("https://api.groupme.com/v3/bots/post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bot_id: process.env.GROUPME_BOT_ID,
+        text: `📜 ${foundBill} RESULT: ${result} (YES: ${yesCount}, NO: ${noCount})`
+      })
+    });
+
+    delete votes[foundBill];
   }
 
   res.sendStatus(200);
