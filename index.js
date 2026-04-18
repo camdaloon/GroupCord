@@ -15,14 +15,25 @@ const client = new Client({
 const app = express();
 app.use(express.json());
 
-const CHANNEL_NAME = process.env.CHANNEL_NAME;
+// ================= CONFIG =================
+const CHANNEL_NAME = "voting";
+const GUILD_ID = process.env.GUILD_ID;
+
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
+// =========================================
 
 // --------------------
 // Discord → GroupMe
 // --------------------
 client.on("messageCreate", async (message) => {
+  if (!message.guild) return;
   if (message.author.bot) return;
+
+  // LOCK TO ONE SERVER
+  if (message.guild.id !== GUILD_ID) return;
+
+  // LOCK TO CHANNEL NAME
   if (message.channel.name !== CHANNEL_NAME) return;
 
   try {
@@ -49,7 +60,10 @@ app.post("/groupme", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  const channel = client.channels.cache.find(
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) return res.sendStatus(200);
+
+  const channel = guild.channels.cache.find(
     c => c.name === CHANNEL_NAME
   );
 
@@ -60,10 +74,14 @@ app.post("/groupme", async (req, res) => {
   res.sendStatus(200);
 });
 
+// --------------------
 // Start webhook server
-app.listen(process.env.PORT, () => {
-  console.log("Webhook running on port", process.env.PORT);
+// --------------------
+app.listen(process.env.PORT || 8080, () => {
+  console.log("Webhook running on port", process.env.PORT || 8080);
 });
 
+// --------------------
 // Start Discord bot
-client.login(process.env.DISCORD_TOKEN);
+// --------------------
+client.login(DISCORD_TOKEN);
