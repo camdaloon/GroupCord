@@ -30,25 +30,24 @@ const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
+  if (message.channel.name !== "voting") return;
 
-  // LOCK TO ONE SERVER
-  if (message.guild.id !== GUILD_ID) return;
+  const billId = `BILL-${Date.now()}`;
 
-  // LOCK TO CHANNEL NAME
-  if (message.channel.name !== CHANNEL_NAME) return;
+  votes[billId] = {
+    yes: new Set(),
+    no: new Set(),
+    text: message.content
+  };
 
-  try {
-    await fetch("https://api.groupme.com/v3/bots/post", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bot_id: GROUPME_BOT_ID,
-        text: `${message.author.username}: ${message.content}`
-      })
-    });
-  } catch (err) {
-    console.error("GroupMe send error:", err);
-  }
+  await fetch("https://api.groupme.com/v3/bots/post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bot_id: process.env.GROUPME_BOT_ID,
+      text: `[${billId}] ${message.author.username}: ${message.content}\nReply YES or NO`
+    })
+  });
 });
 
 // --------------------
