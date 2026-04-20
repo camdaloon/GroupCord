@@ -65,27 +65,37 @@ app.post("/groupme", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  const text = data.text.toUpperCase();
+  const text = data.text.trim();
+const voter = data.name;
 
-  let foundBill = Object.keys(votes)[Object.keys(votes).length - 1];
-  if (!foundBill) return res.sendStatus(200);
+let foundBill = Object.keys(votes)[Object.keys(votes).length - 1];
+if (!foundBill) return res.sendStatus(200);
 
-  if (text.includes("YES")) {
-    votes[foundBill].yes.add(data.name);
-  }
+// Only accept emoji votes
+if (text !== "✅" && text !== "❌") {
+  return res.sendStatus(200);
+}
 
-  if (text.includes("NO")) {
-    votes[foundBill].no.add(data.name);
-  }
+// Remove previous vote if exists
+const previousVote = votes[foundBill].voters.get(voter);
 
-  const guilds = client.guilds.cache;
+if (previousVote === "yes") {
+  votes[foundBill].yes.delete(voter);
+}
+if (previousVote === "no") {
+  votes[foundBill].no.delete(voter);
+}
 
-  const resultChannelSend = (msg) => {
-    guilds.forEach(g => {
-      const channel = g.channels.cache.find(c => c.name === "voting");
-      if (channel) channel.send(msg);
-    });
-  };
+// Add new vote
+if (text === "✅") {
+  votes[foundBill].yes.add(voter);
+  votes[foundBill].voters.set(voter, "yes");
+}
+
+if (text === "❌") {
+  votes[foundBill].no.add(voter);
+  votes[foundBill].voters.set(voter, "no");
+}
 
   const yesCount = votes[foundBill].yes.size;
   const noCount = votes[foundBill].no.size;
