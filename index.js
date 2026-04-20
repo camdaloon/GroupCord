@@ -65,7 +65,8 @@ app.post("/groupme", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  const text = data.text.trim();
+  
+const text = data.text.trim();
 const voter = data.name;
 
 let foundBill = Object.keys(votes)[Object.keys(votes).length - 1];
