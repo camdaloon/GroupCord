@@ -34,20 +34,25 @@ client.on("messageCreate", async (message) => {
 
   const billId = `BILL-${Date.now()}`;
 
-  votes[billId] = {
-    yes: new Set(),
-    no: new Set(),
-    text: message.content
-  };
+votes[billId] = {
+  yes: new Set(),
+  no: new Set(),
+  voters: new Map(), // NEW
+  text: message.content
+};
 
-  await fetch("https://api.groupme.com/v3/bots/post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bot_id: process.env.GROUPME_BOT_ID,
-      text: `[${billId}] ${message.author.username}: ${message.content}\nReply YES or NO`
-    })
-  });
+await fetch("https://api.groupme.com/v3/bots/post", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    bot_id: process.env.GROUPME_BOT_ID,
+    text: `📜 [${billId}]
+${message.author.username}: ${message.content}
+
+Vote by sending:
+✅ = YES
+❌ = NO`
+  })
 });
 
 // --------------------
