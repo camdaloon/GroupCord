@@ -143,7 +143,6 @@ React to vote:
 
   messageToBill[sentMsg.id] = billId;
 
-  // Send to GroupMe
   const groupmeRes = await fetch("https://api.groupme.com/v3/bots/post", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -152,16 +151,23 @@ React to vote:
       text: msgText + "\n\nVote with:\n✅ or ❌"
     })
   });
-
-  // Try to store latest message for pinning (best-effort)
+  
+  // BEST-EFFORT PINNING (GroupMe is inconsistent here)
   try {
     const data = await groupmeRes.json();
-    if (data?.response?.message_id) {
-      latestGroupMeMessageId = data.response.message_id;
-      await pinLatestGroupMeMessage(latestGroupMeMessageId);
+
+    // some environments return message_id differently
+    const messageId =
+      data?.response?.message_id ||
+      data?.response?.id ||
+      null;
+  
+    if (messageId) {
+      latestGroupMeMessageId = messageId;
+      await pinLatestGroupMeMessage(messageId);
     }
-  } catch (e) {
-    // ignore
+  } catch (err) {
+    console.log("GroupMe pin parse failed:", err.message);
   }
 });
 
