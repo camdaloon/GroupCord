@@ -57,7 +57,7 @@ client.on("messageCreate", async (message) => {
       text: billText
     };
 
-    const msg = `📜 [${billId}]
+const msg = `📜 [${billId}]
 ${message.author.username}: ${billText}
 
 Vote:
