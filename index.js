@@ -4,34 +4,48 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const fetch = require("node-fetch");
 const express = require("express");
 
+// ===============================
+// CONFIG (EDIT IN RAILWAY ENV)
+// ===============================
+const CHANNEL_NAME = process.env.CHANNEL_NAME || "voting";
+const VOTES_REQUIRED = parseInt(process.env.VOTES_REQUIRED || "3");
+
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
+
+// ===============================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions // IMPORTANT
+    GatewayIntentBits.GuildMessageReactions
   ]
 });
 
 const app = express();
 app.use(express.json());
 
-const CHANNEL_NAME = "voting";
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
-
+// ===============================
+// STORAGE
+// ===============================
 const votes = {};
-const messageToBill = {}; // maps discord message → bill
+const messageToBill = {};
 
+// ===============================
+// HELPERS
+// ===============================
 function sendToAllChannels(message) {
   client.guilds.cache.forEach(guild => {
-    const channel = guild.channels.cache.find(c => c.name === CHANNEL_NAME);
+    const channel = guild.channels.cache.find(
+      c => c.name === CHANNEL_NAME
+    );
     if (channel) channel.send(message);
   });
 }
 
 // ===============================
-// CREATE BILL
+// CREATE BILL (!bill)
 // ===============================
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
@@ -54,18 +68,17 @@ client.on("messageCreate", async (message) => {
   const msgText = `📜 [${billId}]
 ${message.author.username}: ${billText}
 
-React below to vote:
+React to vote:
 ✅ = YES
 ❌ = NO`;
 
   // Send to Discord
   const sentMsg = await message.channel.send(msgText);
 
-  // Add reactions automatically
+  // Auto reactions
   await sentMsg.react("✅");
   await sentMsg.react("❌");
 
-  // Link message to bill
   messageToBill[sentMsg.id] = billId;
 
   // Send to GroupMe
@@ -74,13 +87,13 @@ React below to vote:
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       bot_id: GROUPME_BOT_ID,
-      text: msgText + "\n\nVote by sending ✅ or ❌"
+      text: msgText + `\n\nVote with:\n✅ or ❌`
     })
   });
 });
 
 // ===============================
-// DISCORD REACTION VOTING
+// DISCORD REACTIONS
 // ===============================
 client.on("messageReactionAdd", (reaction, user) => {
   if (user.bot) return;
@@ -90,7 +103,6 @@ client.on("messageReactionAdd", (reaction, user) => {
 
   const voter = user.username;
 
-  // Remove previous vote
   const prev = votes[billId].voters.get(voter);
   if (prev === "yes") votes[billId].yes.delete(voter);
   if (prev === "no") votes[billId].no.delete(voter);
@@ -108,13 +120,11 @@ client.on("messageReactionAdd", (reaction, user) => {
   const yesCount = votes[billId].yes.size;
   const noCount = votes[billId].no.size;
 
-  const updateMsg = `📊 ${billId} Votes:\n✅ ${yesCount} | ❌ ${noCount}`;
-
-  sendToAllChannels(updateMsg);
+  sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
 });
 
 // ===============================
-// GROUPME → DISCORD VOTING
+// GROUPME VOTING
 // ===============================
 app.post("/groupme", async (req, res) => {
   const data = req.body;
@@ -150,16 +160,38 @@ app.post("/groupme", async (req, res) => {
   const yesCount = votes[billId].yes.size;
   const noCount = votes[billId].no.size;
 
-  const updateMsg = `📊 ${billId} Votes:\n✅ ${yesCount} | ❌ ${noCount}`;
+  sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
 
-  sendToAllChannels(updateMsg);
+  // ===============================
+  // AUTO END CONDITION (CONFIG)
+  // ===============================
+  if (yesCount + noCount >= VOTES_REQUIRED) {
+    const result = yesCount > noCount ? "PASSED" : "FAILED";
+
+    const finalMsg = `📜 ${billId} RESULT: ${result}
+✅ ${yesCount} | ❌ ${noCount}
+(Needed ${VOTES_REQUIRED})`;
+
+    sendToAllChannels(finalMsg);
+
+    await fetch("https://api.groupme.com/v3/bots/post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bot_id: GROUPME_BOT_ID,
+        text: finalMsg
+      })
+    });
+
+    delete votes[billId];
+  }
 
   res.sendStatus(200);
 });
 
 // ===============================
 app.listen(process.env.PORT || 8080, () => {
-  console.log("Webhook running on port", process.env.PORT || 8080);
+  console.log("Bot running on port", process.env.PORT || 8080);
 });
 
 client.login(DISCORD_TOKEN);
