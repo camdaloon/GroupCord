@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 const express = require("express");
 
 // ===============================
-// CONFIG (EDIT IN RAILWAY ENV)
+// CONFIG (RAILWAY ENV CONTROLLED)
 // ===============================
 const CHANNEL_NAME = process.env.CHANNEL_NAME || "voting";
 const VOTES_REQUIRED = parseInt(process.env.VOTES_REQUIRED || "3");
@@ -73,7 +73,6 @@ React to vote:
 ✅ = YES
 ❌ = NO`;
 
-  // Send to Discord
   const sentMsg = await message.channel.send(msgText);
 
   // Auto reactions
@@ -94,26 +93,48 @@ React to vote:
 });
 
 // ===============================
-// DISCORD REACTIONS
+// DISCORD REACTION VOTING (FIXED)
 // ===============================
-client.on("messageReactionAdd", (reaction, user) => {
+client.on("messageReactionAdd", async (reaction, user) => {
   if (user.bot) return;
+
+  if (reaction.partial) await reaction.fetch();
+  if (reaction.message.partial) await reaction.message.fetch();
 
   const billId = messageToBill[reaction.message.id];
   if (!billId) return;
 
   const voter = user.username;
+  const emoji = reaction.emoji.name;
 
+  try {
+    const reactions = reaction.message.reactions.cache;
+
+    // REMOVE opposite reaction (enforces single vote)
+    if (emoji === "✅") {
+      const opposite = reactions.get("❌");
+      if (opposite) await opposite.users.remove(user.id);
+    }
+
+    if (emoji === "❌") {
+      const opposite = reactions.get("✅");
+      if (opposite) await opposite.users.remove(user.id);
+    }
+  } catch (err) {
+    console.log("Reaction remove error:", err);
+  }
+
+  // Update vote system
   const prev = votes[billId].voters.get(voter);
   if (prev === "yes") votes[billId].yes.delete(voter);
   if (prev === "no") votes[billId].no.delete(voter);
 
-  if (reaction.emoji.name === "✅") {
+  if (emoji === "✅") {
     votes[billId].yes.add(voter);
     votes[billId].voters.set(voter, "yes");
   }
 
-  if (reaction.emoji.name === "❌") {
+  if (emoji === "❌") {
     votes[billId].no.add(voter);
     votes[billId].voters.set(voter, "no");
   }
@@ -163,9 +184,6 @@ app.post("/groupme", async (req, res) => {
 
   sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
 
-  // ===============================
-  // AUTO END CONDITION (CONFIG)
-  // ===============================
   if (yesCount + noCount >= VOTES_REQUIRED) {
     const result = yesCount > noCount ? "PASSED" : "FAILED";
 
