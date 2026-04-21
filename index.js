@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 const express = require("express");
 
 // ===============================
-// CONFIG (RAILWAY ENV CONTROLLED)
+// CONFIG
 // ===============================
 const CHANNEL_NAME = process.env.CHANNEL_NAME || "voting";
 const VOTES_REQUIRED = parseInt(process.env.VOTES_REQUIRED || "3");
@@ -48,42 +48,62 @@ function sendToAllChannels(message) {
 // ===============================
 // CREATE BILL (!bill)
 // ===============================
-if (!message.content.startsWith("!bill ")) return;
+client.on("messageCreate", async (message) => {
+  if (!message.guild) return;
+  if (message.author.bot) return;
+  if (message.channel.name !== CHANNEL_NAME) return;
 
-const raw = message.content.slice(6).trim();
+  if (!message.content.startsWith("!bill ")) return;
 
-// Split into name + text
-const parts = raw.split("|");
+  const raw = message.content.slice(6).trim();
 
-let billName = parts[0]?.trim();
-const billText = parts[1]?.trim();
+  // format: name | text
+  const parts = raw.split("|");
 
-if (!billText) {
-  message.channel.send("❌ Use format: !bill <name> | <text>");
-  return;
-}
+  let billName = parts[0]?.trim();
+  const billText = parts[1]?.trim();
 
-// fallback name if none provided
-if (!billName) billName = `Bill-${Date.now()}`;
+  if (!billText) {
+    message.channel.send("❌ Use: !bill <name> | <text>");
+    return;
+  }
 
-const billId = billName;
+  if (!billName) billName = `Bill-${Date.now()}`;
 
-// store vote
-votes[billId] = {
-  yes: new Set(),
-  no: new Set(),
-  voters: new Map()
-};
+  const billId = billName;
 
-const msgText = `📜 [${billId}]
+  votes[billId] = {
+    yes: new Set(),
+    no: new Set(),
+    voters: new Map()
+  };
+
+  const msgText = `📜 [${billId}]
 ${message.author.username}: ${billText}
 
 React to vote:
 ✅ = YES
 ❌ = NO`;
 
+  const sentMsg = await message.channel.send(msgText);
+
+  await sentMsg.react("✅");
+  await sentMsg.react("❌");
+
+  messageToBill[sentMsg.id] = billId;
+
+  await fetch("https://api.groupme.com/v3/bots/post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bot_id: GROUPME_BOT_ID,
+      text: msgText + "\n\nVote with:\n✅ or ❌"
+    })
+  });
+});
+
 // ===============================
-// DISCORD REACTION VOTING (FIXED)
+// DISCORD REACTIONS
 // ===============================
 client.on("messageReactionAdd", async (reaction, user) => {
   if (user.bot) return;
@@ -100,7 +120,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
   try {
     const reactions = reaction.message.reactions.cache;
 
-    // REMOVE opposite reaction (enforces single vote)
     if (emoji === "✅") {
       const opposite = reactions.get("❌");
       if (opposite) await opposite.users.remove(user.id);
@@ -114,7 +133,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
     console.log("Reaction remove error:", err);
   }
 
-  // Update vote system
   const prev = votes[billId].voters.get(voter);
   if (prev === "yes") votes[billId].yes.delete(voter);
   if (prev === "no") votes[billId].no.delete(voter);
