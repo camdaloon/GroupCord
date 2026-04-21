@@ -171,73 +171,58 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const billId = messageToBill[reaction.message.id];
   if (!billId) return;
 
-  const voter = user.username;
+  const voterId = user.id;
   const emoji = reaction.emoji.name;
 
-  const prev = votes[billId].voters.get(voter);
-  if (prev === "yes") votes[billId].yes.delete(voter);
-  if (prev === "no") votes[billId].no.delete(voter);
+  const bill = votes[billId];
+  if (!bill) return;
+
+  const reactions = reaction.message.reactions.cache;
+
+  // REMOVE opposite reaction FIRST (important fix)
+  try {
+    if (emoji === "✅") {
+      const opposite = reactions.get("❌");
+      if (opposite) {
+        const users = await opposite.users.fetch();
+        if (users.has(voterId)) await opposite.users.remove(voterId);
+      }
+    }
+
+    if (emoji === "❌") {
+      const opposite = reactions.get("✅");
+      if (opposite) {
+        const users = await opposite.users.fetch();
+        if (users.has(voterId)) await opposite.users.remove(voterId);
+      }
+    }
+  } catch (err) {
+    console.log("Reaction cleanup error:", err);
+  }
+
+  // FIX vote tracking
+  const voter = user.username;
+
+  const prev = bill.voters.get(voter);
+  if (prev === "yes") bill.yes.delete(voter);
+  if (prev === "no") bill.no.delete(voter);
 
   if (emoji === "✅") {
-    votes[billId].yes.add(voter);
-    votes[billId].voters.set(voter, "yes");
+    bill.yes.add(voter);
+    bill.voters.set(voter, "yes");
   }
 
   if (emoji === "❌") {
-    votes[billId].no.add(voter);
-    votes[billId].voters.set(voter, "no");
+    bill.no.add(voter);
+    bill.voters.set(voter, "no");
   }
 
-  const yesCount = votes[billId].yes.size;
-  const noCount = votes[billId].no.size;
+  const yesCount = bill.yes.size;
+  const noCount = bill.no.size;
 
   sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
 
   checkBillEnd(billId);
-});
-
-// ===============================
-// GROUPME VOTING
-// ===============================
-app.post("/groupme", async (req, res) => {
-  const data = req.body;
-
-  if (!data.text || data.sender_type === "bot") {
-    return res.sendStatus(200);
-  }
-
-  const text = data.text.trim();
-  const voter = data.name;
-
-  const billIds = Object.keys(votes);
-  if (billIds.length === 0) return res.sendStatus(200);
-
-  const billId = billIds[billIds.length - 1];
-
-  if (text !== "✅" && text !== "❌") {
-    return res.sendStatus(200);
-  }
-
-  const prev = votes[billId].voters.get(voter);
-  if (prev === "yes") votes[billId].yes.delete(voter);
-  if (prev === "no") votes[billId].no.delete(voter);
-
-  if (text === "✅") {
-    votes[billId].yes.add(voter);
-    votes[billId].voters.set(voter, "yes");
-  } else {
-    votes[billId].no.add(voter);
-    votes[billId].voters.set(voter, "no");
-  }
-
-  const yesCount = votes[billId].yes.size;
-  const noCount = votes[billId].no.size;
-
-  sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
-
-  checkBillEnd(billId);
-
-  res.sendStatus(200);
 });
 
 // ===============================
