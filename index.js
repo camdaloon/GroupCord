@@ -32,6 +32,7 @@ app.use(express.json());
 // ===============================
 const votes = {};
 const messageToBill = {};
+let latestGroupMeMessageId = null;
 
 // ===============================
 // HELPERS
@@ -46,18 +47,62 @@ function sendToAllChannels(message) {
 }
 
 // ===============================
+// AUTO PIN (GROUPME)
+// ===============================
+async function pinLatestGroupMeMessage(messageId) {
+  if (!messageId) return;
+
+  try {
+    await fetch(`https://api.groupme.com/v3/messages/${messageId}/pin?token=${process.env.GROUPME_ACCESS_TOKEN}`, {
+      method: "POST"
+    });
+  } catch (err) {
+    console.log("Pin failed (GroupMe limitation likely):", err.message);
+  }
+}
+
+// ===============================
+// CHECK BILL END
+// ===============================
+function checkBillEnd(billId) {
+  const bill = votes[billId];
+  if (!bill) return;
+
+  const yesCount = bill.yes.size;
+  const noCount = bill.no.size;
+
+  if (yesCount + noCount < VOTES_REQUIRED) return;
+
+  const result = yesCount > noCount ? "PASSED" : "FAILED";
+
+  const finalMsg = `📜 ${billId} RESULT: ${result}
+✅ ${yesCount} | ❌ ${noCount}
+(Needed ${VOTES_REQUIRED})`;
+
+  sendToAllChannels(finalMsg);
+
+  fetch("https://api.groupme.com/v3/bots/post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bot_id: GROUPME_BOT_ID,
+      text: finalMsg
+    })
+  });
+
+  delete votes[billId];
+}
+
+// ===============================
 // CREATE BILL (!bill)
 // ===============================
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
   if (message.channel.name !== CHANNEL_NAME) return;
-
   if (!message.content.startsWith("!bill ")) return;
 
   const raw = message.content.slice(6).trim();
-
-  // format: name | text
   const parts = raw.split("|");
 
   let billName = parts[0]?.trim();
@@ -92,7 +137,8 @@ React to vote:
 
   messageToBill[sentMsg.id] = billId;
 
-  await fetch("https://api.groupme.com/v3/bots/post", {
+  // Send to GroupMe
+  const groupmeRes = await fetch("https://api.groupme.com/v3/bots/post", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -100,6 +146,17 @@ React to vote:
       text: msgText + "\n\nVote with:\n✅ or ❌"
     })
   });
+
+  // Try to store latest message for pinning (best-effort)
+  try {
+    const data = await groupmeRes.json();
+    if (data?.response?.message_id) {
+      latestGroupMeMessageId = data.response.message_id;
+      await pinLatestGroupMeMessage(latestGroupMeMessageId);
+    }
+  } catch (e) {
+    // ignore
+  }
 });
 
 // ===============================
@@ -116,22 +173,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
   const voter = user.username;
   const emoji = reaction.emoji.name;
-
-  try {
-    const reactions = reaction.message.reactions.cache;
-
-    if (emoji === "✅") {
-      const opposite = reactions.get("❌");
-      if (opposite) await opposite.users.remove(user.id);
-    }
-
-    if (emoji === "❌") {
-      const opposite = reactions.get("✅");
-      if (opposite) await opposite.users.remove(user.id);
-    }
-  } catch (err) {
-    console.log("Reaction remove error:", err);
-  }
 
   const prev = votes[billId].voters.get(voter);
   if (prev === "yes") votes[billId].yes.delete(voter);
@@ -151,6 +192,8 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const noCount = votes[billId].no.size;
 
   sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
+
+  checkBillEnd(billId);
 });
 
 // ===============================
@@ -192,26 +235,7 @@ app.post("/groupme", async (req, res) => {
 
   sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
 
-  if (yesCount + noCount >= VOTES_REQUIRED) {
-    const result = yesCount > noCount ? "PASSED" : "FAILED";
-
-    const finalMsg = `📜 ${billId} RESULT: ${result}
-✅ ${yesCount} | ❌ ${noCount}
-(Needed ${VOTES_REQUIRED})`;
-
-    sendToAllChannels(finalMsg);
-
-    await fetch("https://api.groupme.com/v3/bots/post", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bot_id: GROUPME_BOT_ID,
-        text: finalMsg
-      })
-    });
-
-    delete votes[billId];
-  }
+  checkBillEnd(billId);
 
   res.sendStatus(200);
 });
