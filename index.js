@@ -19,10 +19,9 @@ const CHANNEL_NAME = "voting";
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
 
-// Store votes
 const votes = {};
 
-// Helper: send message to ALL servers
+// Helper to send to all servers
 function sendToAllChannels(message) {
   client.guilds.cache.forEach(guild => {
     const channel = guild.channels.cache.find(
@@ -32,41 +31,102 @@ function sendToAllChannels(message) {
   });
 }
 
-// --------------------
-// Discord → GroupMe (create bill)
-// --------------------
+// ===============================
+// DISCORD MESSAGE HANDLER
+// ===============================
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
   if (message.channel.name !== CHANNEL_NAME) return;
 
-  const billId = `BILL-${Date.now()}`;
+  const content = message.content.trim();
 
-  votes[billId] = {
-    yes: new Set(),
-    no: new Set(),
-    voters: new Map(),
-    text: message.content
-  };
+  // ===============================
+  // CREATE BILL (!bill ...)
+  // ===============================
+  if (content.startsWith("!bill ")) {
+    const billText = content.slice(6).trim();
+    if (!billText) return;
 
-  await fetch("https://api.groupme.com/v3/bots/post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bot_id: GROUPME_BOT_ID,
-      text: `📜 [${billId}]
-${message.author.username}: ${message.content}
+    const billId = `BILL-${Date.now()}`;
 
-Vote by sending:
+    votes[billId] = {
+      yes: new Set(),
+      no: new Set(),
+      voters: new Map(),
+      text: billText
+    };
+
+    const msg = `📜 [${billId}]
+${message.author.username}: ${billText}
+
+Vote:
 ✅ = YES
-❌ = NO`
-    })
-  });
+❌ = NO`;
+
+    // Send to GroupMe
+    await fetch("https://api.groupme.com/v3/bots/post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bot_id: GROUPME_BOT_ID,
+        text: msg
+      })
+    });
+
+    // Send to Discord servers
+    sendToAllChannels(msg);
+    return;
+  }
+
+  // ===============================
+  // DISCORD VOTING (✅ / ❌)
+  // ===============================
+  if (content === "✅" || content === "❌") {
+    const billIds = Object.keys(votes);
+    if (billIds.length === 0) return;
+
+    const billId = billIds[billIds.length - 1];
+    const voter = message.author.username;
+
+    // Remove previous vote
+    const prev = votes[billId].voters.get(voter);
+    if (prev === "yes") votes[billId].yes.delete(voter);
+    if (prev === "no") votes[billId].no.delete(voter);
+
+    // Add vote
+    if (content === "✅") {
+      votes[billId].yes.add(voter);
+      votes[billId].voters.set(voter, "yes");
+    } else {
+      votes[billId].no.add(voter);
+      votes[billId].voters.set(voter, "no");
+    }
+
+    const yesCount = votes[billId].yes.size;
+    const noCount = votes[billId].no.size;
+
+    const updateMsg = `📊 ${billId} Votes:\n✅ ${yesCount} | ❌ ${noCount}`;
+
+    sendToAllChannels(updateMsg);
+
+    // Also send update to GroupMe
+    await fetch("https://api.groupme.com/v3/bots/post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bot_id: GROUPME_BOT_ID,
+        text: updateMsg
+      })
+    });
+
+    return;
+  }
 });
 
-// --------------------
-// GroupMe → Discord (handle votes)
-// --------------------
+// ===============================
+// GROUPME → DISCORD VOTING
+// ===============================
 app.post("/groupme", async (req, res) => {
   const data = req.body;
 
@@ -77,30 +137,23 @@ app.post("/groupme", async (req, res) => {
   const text = data.text.trim();
   const voter = data.name;
 
-  // Get latest bill
   const billIds = Object.keys(votes);
   if (billIds.length === 0) return res.sendStatus(200);
 
   const billId = billIds[billIds.length - 1];
 
-  // Only allow emoji votes
   if (text !== "✅" && text !== "❌") {
     return res.sendStatus(200);
   }
 
-  // Remove previous vote
-  const previous = votes[billId].voters.get(voter);
+  const prev = votes[billId].voters.get(voter);
+  if (prev === "yes") votes[billId].yes.delete(voter);
+  if (prev === "no") votes[billId].no.delete(voter);
 
-  if (previous === "yes") votes[billId].yes.delete(voter);
-  if (previous === "no") votes[billId].no.delete(voter);
-
-  // Add new vote
   if (text === "✅") {
     votes[billId].yes.add(voter);
     votes[billId].voters.set(voter, "yes");
-  }
-
-  if (text === "❌") {
+  } else {
     votes[billId].no.add(voter);
     votes[billId].voters.set(voter, "no");
   }
@@ -108,35 +161,14 @@ app.post("/groupme", async (req, res) => {
   const yesCount = votes[billId].yes.size;
   const noCount = votes[billId].no.size;
 
-  // Send live update to Discord
-  sendToAllChannels(
-    `📊 ${billId} Votes:\n✅ ${yesCount} | ❌ ${noCount}`
-  );
+  const updateMsg = `📊 ${billId} Votes:\n✅ ${yesCount} | ❌ ${noCount}`;
 
-  // Auto-finish at 3 votes (you can change this number)
-  if (yesCount + noCount >= 3) {
-    const result = yesCount > noCount ? "PASSED" : "FAILED";
-
-    const finalMsg = `📜 ${billId} RESULT: ${result}\n✅ ${yesCount} | ❌ ${noCount}`;
-
-    sendToAllChannels(finalMsg);
-
-    await fetch("https://api.groupme.com/v3/bots/post", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bot_id: GROUPME_BOT_ID,
-        text: finalMsg
-      })
-    });
-
-    delete votes[billId];
-  }
+  sendToAllChannels(updateMsg);
 
   res.sendStatus(200);
 });
 
-// --------------------
+// ===============================
 app.listen(process.env.PORT || 8080, () => {
   console.log("Webhook running on port", process.env.PORT || 8080);
 });
