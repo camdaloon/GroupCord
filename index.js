@@ -48,49 +48,39 @@ function sendToAllChannels(message) {
 // ===============================
 // CREATE BILL (!bill)
 // ===============================
-client.on("messageCreate", async (message) => {
-  if (!message.guild) return;
-  if (message.author.bot) return;
-  if (message.channel.name !== CHANNEL_NAME) return;
+if (!message.content.startsWith("!bill ")) return;
 
-  if (!message.content.startsWith("!bill ")) return;
+const raw = message.content.slice(6).trim();
 
-  const billText = message.content.slice(6).trim();
-  if (!billText) return;
+// Split into name + text
+const parts = raw.split("|");
 
-  const billId = `BILL-${Date.now()}`;
+let billName = parts[0]?.trim();
+const billText = parts[1]?.trim();
 
-  votes[billId] = {
-    yes: new Set(),
-    no: new Set(),
-    voters: new Map()
-  };
+if (!billText) {
+  message.channel.send("❌ Use format: !bill <name> | <text>");
+  return;
+}
 
-  const msgText = `📜 [${billId}]
+// fallback name if none provided
+if (!billName) billName = `Bill-${Date.now()}`;
+
+const billId = billName;
+
+// store vote
+votes[billId] = {
+  yes: new Set(),
+  no: new Set(),
+  voters: new Map()
+};
+
+const msgText = `📜 [${billId}]
 ${message.author.username}: ${billText}
 
 React to vote:
 ✅ = YES
 ❌ = NO`;
-
-  const sentMsg = await message.channel.send(msgText);
-
-  // Auto reactions
-  await sentMsg.react("✅");
-  await sentMsg.react("❌");
-
-  messageToBill[sentMsg.id] = billId;
-
-  // Send to GroupMe
-  await fetch("https://api.groupme.com/v3/bots/post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bot_id: GROUPME_BOT_ID,
-      text: msgText + `\n\nVote with:\n✅ or ❌`
-    })
-  });
-});
 
 // ===============================
 // DISCORD REACTION VOTING (FIXED)
