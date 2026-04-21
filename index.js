@@ -53,11 +53,17 @@ async function pinLatestGroupMeMessage(messageId) {
   if (!messageId) return;
 
   try {
-    await fetch(`https://api.groupme.com/v3/messages/${messageId}/pin?token=${process.env.GROUPME_ACCESS_TOKEN}`, {
-      method: "POST"
-    });
+    // small delay helps GroupMe register message
+    setTimeout(async () => {
+      await fetch(`https://api.groupme.com/v3/messages/${messageId}/pin`, {
+        method: "POST",
+        headers: {
+          "X-Access-Token": process.env.GROUPME_ACCESS_TOKEN
+        }
+      });
+    }, 1500);
   } catch (err) {
-    console.log("Pin failed (GroupMe limitation likely):", err.message);
+    console.log("Pin failed (expected limitation in GroupMe API):", err.message);
   }
 }
 
