@@ -20,7 +20,8 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions
-  ]
+  ],
+  partials: ["MESSAGE", "CHANNEL", "REACTION"]
 });
 
 const app = express();
