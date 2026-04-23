@@ -31,20 +31,12 @@ app.use(express.json());
 // ===============================
 const votes = {};
 const messageToBill = {};
+const billToMessage = {}; // ⭐ NEW
 let latestBillId = null;
 
 // ===============================
 // HELPERS
 // ===============================
-function sendToAllChannels(message) {
-  client.guilds.cache.forEach(guild => {
-    const channel = guild.channels.cache.find(
-      c => c.name === CHANNEL_NAME
-    );
-    if (channel) channel.send(message);
-  });
-}
-
 async function sendToGroupMe(text) {
   await fetch("https://api.groupme.com/v3/bots/post", {
     method: "POST",
@@ -56,7 +48,40 @@ async function sendToGroupMe(text) {
   });
 }
 
-// 🔥 NEW: Repost bill so it never gets buried
+// ===============================
+// UPDATE DISCORD BILL MESSAGE
+// ===============================
+async function updateDiscordMessage(billId) {
+  const bill = votes[billId];
+  const msg = billToMessage[billId];
+
+  if (!bill || !msg) return;
+
+  const yesCount = bill.yes.size;
+  const noCount = bill.no.size;
+
+  const baseLines = msg.content.split("\n");
+
+  const updated = `📜 [${billId}]
+${baseLines[1]}
+
+React to vote:
+✅ = YES
+❌ = NO
+
+📊 Votes:
+✅ ${yesCount} | ❌ ${noCount}`;
+
+  try {
+    await msg.edit(updated);
+  } catch (err) {
+    console.log("Edit failed:", err.message);
+  }
+}
+
+// ===============================
+// REPOST TO GROUPME
+// ===============================
 async function repostBillToGroupMe(billId) {
   const bill = votes[billId];
   if (!bill) return;
@@ -73,7 +98,7 @@ Vote with:
 }
 
 // ===============================
-// END BILL MANUALLY
+// END BILL
 // ===============================
 function endBill(billId) {
   const bill = votes[billId];
@@ -87,10 +112,16 @@ function endBill(billId) {
   const finalMsg = `📜 ${billId} RESULT: ${result}
 ✅ ${yesCount} | ❌ ${noCount}`;
 
-  sendToAllChannels(finalMsg);
+  // Edit final message in Discord
+  const msg = billToMessage[billId];
+  if (msg) {
+    msg.edit(finalMsg);
+  }
+
   sendToGroupMe(finalMsg);
 
   delete votes[billId];
+  delete billToMessage[billId];
   latestBillId = null;
 }
 
@@ -102,9 +133,7 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (message.channel.name !== CHANNEL_NAME) return;
 
-  // ===============================
   // END COMMAND
-  // ===============================
   if (message.content === "!voteend") {
     if (!latestBillId) {
       message.channel.send("❌ No active bill");
@@ -115,9 +144,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // ===============================
   // CREATE BILL
-  // ===============================
   if (!message.content.startsWith("!bill ")) return;
 
   const raw = message.content.slice(6).trim();
@@ -147,7 +174,10 @@ ${message.author.username}: ${billText}
 
 React to vote:
 ✅ = YES
-❌ = NO`;
+❌ = NO
+
+📊 Votes:
+✅ 0 | ❌ 0`;
 
   const sentMsg = await message.channel.send(msgText);
 
@@ -155,8 +185,8 @@ React to vote:
   await sentMsg.react("❌");
 
   messageToBill[sentMsg.id] = billId;
+  billToMessage[billId] = sentMsg; // ⭐ store message
 
-  // Initial GroupMe post
   await sendToGroupMe("📌 CURRENT BILL\n" + msgText + "\n\nVote with ✅ or ❌");
 });
 
@@ -205,9 +235,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     bill.voters.set(voter, "no");
   }
 
-  sendToAllChannels(`📊 ${billId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
-
-  // 🔥 NEW: repost to GroupMe
+  await updateDiscordMessage(billId);
   await repostBillToGroupMe(billId);
 });
 
@@ -248,9 +276,7 @@ app.post("/groupme", async (req, res) => {
     bill.voters.set(voter, "no");
   }
 
-  sendToAllChannels(`📊 ${latestBillId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
-
-  // 🔥 NEW: repost to GroupMe
+  await updateDiscordMessage(latestBillId);
   await repostBillToGroupMe(latestBillId);
 
   res.sendStatus(200);
