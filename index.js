@@ -56,6 +56,22 @@ async function sendToGroupMe(text) {
   });
 }
 
+// 🔥 NEW: Repost bill so it never gets buried
+async function repostBillToGroupMe(billId) {
+  const bill = votes[billId];
+  if (!bill) return;
+
+  const text = `📌 CURRENT BILL
+[${billId}]
+
+✅ ${bill.yes.size} | ❌ ${bill.no.size}
+
+Vote with:
+✅ / ❌ / yes / no`;
+
+  await sendToGroupMe(text);
+}
+
 // ===============================
 // END BILL MANUALLY
 // ===============================
@@ -140,7 +156,7 @@ React to vote:
 
   messageToBill[sentMsg.id] = billId;
 
-  // "Fake pin" (re-sent highlight message)
+  // Initial GroupMe post
   await sendToGroupMe("📌 CURRENT BILL\n" + msgText + "\n\nVote with ✅ or ❌");
 });
 
@@ -190,10 +206,13 @@ client.on("messageReactionAdd", async (reaction, user) => {
   }
 
   sendToAllChannels(`📊 ${billId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
+
+  // 🔥 NEW: repost to GroupMe
+  await repostBillToGroupMe(billId);
 });
 
 // ===============================
-// GROUPME VOTING (FIXED)
+// GROUPME VOTING
 // ===============================
 app.post("/groupme", async (req, res) => {
   const data = req.body;
@@ -210,7 +229,6 @@ app.post("/groupme", async (req, res) => {
   const bill = votes[latestBillId];
   if (!bill) return res.sendStatus(200);
 
-  // ACCEPT MULTIPLE INPUT TYPES
   let vote = null;
 
   if (text === "✅" || text === "yes" || text === "y") vote = "yes";
@@ -231,6 +249,9 @@ app.post("/groupme", async (req, res) => {
   }
 
   sendToAllChannels(`📊 ${latestBillId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
+
+  // 🔥 NEW: repost to GroupMe
+  await repostBillToGroupMe(latestBillId);
 
   res.sendStatus(200);
 });
