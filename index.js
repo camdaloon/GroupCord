@@ -8,7 +8,6 @@ const express = require("express");
 // CONFIG
 // ===============================
 const CHANNEL_NAME = process.env.CHANNEL_NAME || "voting";
-const VOTES_REQUIRED = parseInt(process.env.VOTES_REQUIRED || "3");
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROUPME_BOT_ID = process.env.GROUPME_BOT_ID;
@@ -32,7 +31,7 @@ app.use(express.json());
 // ===============================
 const votes = {};
 const messageToBill = {};
-let latestGroupMeMessageId = null;
+let latestBillId = null;
 
 // ===============================
 // HELPERS
@@ -46,66 +45,63 @@ function sendToAllChannels(message) {
   });
 }
 
-// ===============================
-// AUTO PIN (GROUPME)
-// ===============================
-async function pinLatestGroupMeMessage(messageId) {
-  if (!messageId) return;
-
-  try {
-    // small delay helps GroupMe register message
-    setTimeout(async () => {
-      await fetch(`https://api.groupme.com/v3/messages/${messageId}/pin`, {
-        method: "POST",
-        headers: {
-          "X-Access-Token": process.env.GROUPME_ACCESS_TOKEN
-        }
-      });
-    }, 1500);
-  } catch (err) {
-    console.log("Pin failed (expected limitation in GroupMe API):", err.message);
-  }
+async function sendToGroupMe(text) {
+  await fetch("https://api.groupme.com/v3/bots/post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bot_id: GROUPME_BOT_ID,
+      text
+    })
+  });
 }
 
 // ===============================
-// CHECK BILL END
+// END BILL MANUALLY
 // ===============================
-function checkBillEnd(billId) {
+function endBill(billId) {
   const bill = votes[billId];
   if (!bill) return;
 
   const yesCount = bill.yes.size;
   const noCount = bill.no.size;
 
-  if (yesCount + noCount < VOTES_REQUIRED) return;
-
   const result = yesCount > noCount ? "PASSED" : "FAILED";
 
   const finalMsg = `📜 ${billId} RESULT: ${result}
-✅ ${yesCount} | ❌ ${noCount}
-(Needed ${VOTES_REQUIRED})`;
+✅ ${yesCount} | ❌ ${noCount}`;
 
   sendToAllChannels(finalMsg);
-
-  fetch("https://api.groupme.com/v3/bots/post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bot_id: GROUPME_BOT_ID,
-      text: finalMsg
-    })
-  });
+  sendToGroupMe(finalMsg);
 
   delete votes[billId];
+  latestBillId = null;
 }
 
 // ===============================
-// CREATE BILL (!bill)
+// CREATE BILL + COMMANDS
 // ===============================
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
   if (message.channel.name !== CHANNEL_NAME) return;
+
+  // ===============================
+  // END COMMAND
+  // ===============================
+  if (message.content === "!voteend") {
+    if (!latestBillId) {
+      message.channel.send("❌ No active bill");
+      return;
+    }
+
+    endBill(latestBillId);
+    return;
+  }
+
+  // ===============================
+  // CREATE BILL
+  // ===============================
   if (!message.content.startsWith("!bill ")) return;
 
   const raw = message.content.slice(6).trim();
@@ -122,6 +118,7 @@ client.on("messageCreate", async (message) => {
   if (!billName) billName = `Bill-${Date.now()}`;
 
   const billId = billName;
+  latestBillId = billId;
 
   votes[billId] = {
     yes: new Set(),
@@ -143,32 +140,8 @@ React to vote:
 
   messageToBill[sentMsg.id] = billId;
 
-  const groupmeRes = await fetch("https://api.groupme.com/v3/bots/post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bot_id: GROUPME_BOT_ID,
-      text: msgText + "\n\nVote with:\n✅ or ❌"
-    })
-  });
-  
-  // BEST-EFFORT PINNING (GroupMe is inconsistent here)
-  try {
-    const data = await groupmeRes.json();
-
-    // some environments return message_id differently
-    const messageId =
-      data?.response?.message_id ||
-      data?.response?.id ||
-      null;
-  
-    if (messageId) {
-      latestGroupMeMessageId = messageId;
-      await pinLatestGroupMeMessage(messageId);
-    }
-  } catch (err) {
-    console.log("GroupMe pin parse failed:", err.message);
-  }
+  // "Fake pin" (re-sent highlight message)
+  await sendToGroupMe("📌 CURRENT BILL\n" + msgText + "\n\nVote with ✅ or ❌");
 });
 
 // ===============================
@@ -184,6 +157,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
   if (!billId) return;
 
   const voterId = user.id;
+  const voter = user.username;
   const emoji = reaction.emoji.name;
 
   const bill = votes[billId];
@@ -191,29 +165,17 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
   const reactions = reaction.message.reactions.cache;
 
-  // REMOVE opposite reaction FIRST (important fix)
   try {
     if (emoji === "✅") {
       const opposite = reactions.get("❌");
-      if (opposite) {
-        const users = await opposite.users.fetch();
-        if (users.has(voterId)) await opposite.users.remove(voterId);
-      }
+      if (opposite) await opposite.users.remove(voterId);
     }
 
     if (emoji === "❌") {
       const opposite = reactions.get("✅");
-      if (opposite) {
-        const users = await opposite.users.fetch();
-        if (users.has(voterId)) await opposite.users.remove(voterId);
-      }
+      if (opposite) await opposite.users.remove(voterId);
     }
-  } catch (err) {
-    console.log("Reaction cleanup error:", err);
-  }
-
-  // FIX vote tracking
-  const voter = user.username;
+  } catch {}
 
   const prev = bill.voters.get(voter);
   if (prev === "yes") bill.yes.delete(voter);
@@ -222,19 +184,55 @@ client.on("messageReactionAdd", async (reaction, user) => {
   if (emoji === "✅") {
     bill.yes.add(voter);
     bill.voters.set(voter, "yes");
-  }
-
-  if (emoji === "❌") {
+  } else if (emoji === "❌") {
     bill.no.add(voter);
     bill.voters.set(voter, "no");
   }
 
-  const yesCount = bill.yes.size;
-  const noCount = bill.no.size;
+  sendToAllChannels(`📊 ${billId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
+});
 
-  sendToAllChannels(`📊 ${billId}\n✅ ${yesCount} | ❌ ${noCount}`);
+// ===============================
+// GROUPME VOTING (FIXED)
+// ===============================
+app.post("/groupme", async (req, res) => {
+  const data = req.body;
 
-  checkBillEnd(billId);
+  if (!data.text || data.sender_type === "bot") {
+    return res.sendStatus(200);
+  }
+
+  const text = data.text.trim().toLowerCase();
+  const voter = data.name;
+
+  if (!latestBillId) return res.sendStatus(200);
+
+  const bill = votes[latestBillId];
+  if (!bill) return res.sendStatus(200);
+
+  // ACCEPT MULTIPLE INPUT TYPES
+  let vote = null;
+
+  if (text === "✅" || text === "yes" || text === "y") vote = "yes";
+  if (text === "❌" || text === "no" || text === "n") vote = "no";
+
+  if (!vote) return res.sendStatus(200);
+
+  const prev = bill.voters.get(voter);
+  if (prev === "yes") bill.yes.delete(voter);
+  if (prev === "no") bill.no.delete(voter);
+
+  if (vote === "yes") {
+    bill.yes.add(voter);
+    bill.voters.set(voter, "yes");
+  } else {
+    bill.no.add(voter);
+    bill.voters.set(voter, "no");
+  }
+
+  sendToAllChannels(`📊 ${latestBillId}\n✅ ${bill.yes.size} | ❌ ${bill.no.size}`);
+
+  res.sendStatus(200);
 });
 
 // ===============================
