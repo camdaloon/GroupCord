@@ -31,11 +31,11 @@ app.use(express.json());
 // ===============================
 const votes = {};
 const messageToBill = {};
-const billToMessage = {}; // ⭐ NEW
+const billToMessage = {};
 let latestBillId = null;
 
 // ===============================
-// HELPERS
+// GROUPME SEND
 // ===============================
 async function sendToGroupMe(text) {
   await fetch("https://api.groupme.com/v3/bots/post", {
@@ -49,38 +49,38 @@ async function sendToGroupMe(text) {
 }
 
 // ===============================
-// UPDATE DISCORD BILL MESSAGE
+// UPDATE DISCORD MESSAGE
 // ===============================
 async function updateDiscordMessage(billId) {
   const bill = votes[billId];
   const msg = billToMessage[billId];
-
   if (!bill || !msg) return;
 
-  const yesCount = bill.yes.size;
-  const noCount = bill.no.size;
+  const yes = bill.yes.size;
+  const no = bill.no.size;
 
-  const baseLines = msg.content.split("\n");
+  const lines = msg.content.split("\n");
+  const billTextLine = lines[1] || "";
 
   const updated = `📜 [${billId}]
-${baseLines[1]}
+${billTextLine}
 
 React to vote:
 ✅ = YES
 ❌ = NO
 
 📊 Votes:
-✅ ${yesCount} | ❌ ${noCount}`;
+✅ ${yes} | ❌ ${no}`;
 
   try {
     await msg.edit(updated);
-  } catch (err) {
-    console.log("Edit failed:", err.message);
+  } catch (e) {
+    console.log("Discord edit failed:", e.message);
   }
 }
 
 // ===============================
-// REPOST TO GROUPME
+// GROUPME REPOST (WITH DESCRIPTION)
 // ===============================
 async function repostBillToGroupMe(billId) {
   const bill = votes[billId];
@@ -89,6 +89,9 @@ async function repostBillToGroupMe(billId) {
   const text = `📌 CURRENT BILL
 [${billId}]
 
+📄 ${bill.text}
+
+📊 Votes:
 ✅ ${bill.yes.size} | ❌ ${bill.no.size}
 
 Vote with:
@@ -104,19 +107,18 @@ function endBill(billId) {
   const bill = votes[billId];
   if (!bill) return;
 
-  const yesCount = bill.yes.size;
-  const noCount = bill.no.size;
+  const yes = bill.yes.size;
+  const no = bill.no.size;
 
-  const result = yesCount > noCount ? "PASSED" : "FAILED";
+  const result = yes > no ? "PASSED" : "FAILED";
 
   const finalMsg = `📜 ${billId} RESULT: ${result}
-✅ ${yesCount} | ❌ ${noCount}`;
+📄 ${bill.text}
 
-  // Edit final message in Discord
+✅ ${yes} | ❌ ${no}`;
+
   const msg = billToMessage[billId];
-  if (msg) {
-    msg.edit(finalMsg);
-  }
+  if (msg) msg.edit(finalMsg);
 
   sendToGroupMe(finalMsg);
 
@@ -126,7 +128,7 @@ function endBill(billId) {
 }
 
 // ===============================
-// CREATE BILL + COMMANDS
+// CREATE BILL
 // ===============================
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
@@ -135,11 +137,7 @@ client.on("messageCreate", async (message) => {
 
   // END COMMAND
   if (message.content === "!voteend") {
-    if (!latestBillId) {
-      message.channel.send("❌ No active bill");
-      return;
-    }
-
+    if (!latestBillId) return message.channel.send("❌ No active bill");
     endBill(latestBillId);
     return;
   }
@@ -154,8 +152,7 @@ client.on("messageCreate", async (message) => {
   const billText = parts[1]?.trim();
 
   if (!billText) {
-    message.channel.send("❌ Use: !bill <name> | <text>");
-    return;
+    return message.channel.send("❌ Use: !bill <name> | <text>");
   }
 
   if (!billName) billName = `Bill-${Date.now()}`;
@@ -166,7 +163,8 @@ client.on("messageCreate", async (message) => {
   votes[billId] = {
     yes: new Set(),
     no: new Set(),
-    voters: new Map()
+    voters: new Map(),
+    text: billText
   };
 
   const msgText = `📜 [${billId}]
@@ -185,9 +183,9 @@ React to vote:
   await sentMsg.react("❌");
 
   messageToBill[sentMsg.id] = billId;
-  billToMessage[billId] = sentMsg; // ⭐ store message
+  billToMessage[billId] = sentMsg;
 
-  await sendToGroupMe("📌 CURRENT BILL\n" + msgText + "\n\nVote with ✅ or ❌");
+  await sendToGroupMe(`📌 NEW BILL\n[${billId}]\n\n📄 ${billText}\n\nVote: ✅ / ❌`);
 });
 
 // ===============================
@@ -202,24 +200,22 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const billId = messageToBill[reaction.message.id];
   if (!billId) return;
 
-  const voterId = user.id;
-  const voter = user.username;
-  const emoji = reaction.emoji.name;
-
   const bill = votes[billId];
   if (!bill) return;
+
+  const voter = user.username;
+  const emoji = reaction.emoji.name;
 
   const reactions = reaction.message.reactions.cache;
 
   try {
     if (emoji === "✅") {
       const opposite = reactions.get("❌");
-      if (opposite) await opposite.users.remove(voterId);
+      if (opposite) await opposite.users.remove(user.id);
     }
-
     if (emoji === "❌") {
       const opposite = reactions.get("✅");
-      if (opposite) await opposite.users.remove(voterId);
+      if (opposite) await opposite.users.remove(user.id);
     }
   } catch {}
 
