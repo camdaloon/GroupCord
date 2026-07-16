@@ -1,10 +1,12 @@
 # GroupCord
 
 <p align="center">
-  <h3 align="center">Bridge Discord and GroupMe in minutes.</h3>
+  <h1 align="center">GroupCord</h1>
 
   <p align="center">
-    Two-way synchronization between Discord and GroupMe with support for text, images, replies, edits, deletes, webhooks, and multiple bridges.
+    A modern bridge between Discord and GroupMe.
+    <br>
+    Sync messages, images, replies, edits, and deletes in both directions.
   </p>
 </p>
 
@@ -12,7 +14,7 @@
 
 ## 🚀 Invite the Official GroupCord Bot
 
-If you'd rather not host your own copy, you can invite the official GroupCord bot.
+Want to try GroupCord without hosting your own copy?
 
 <p align="center">
 
@@ -20,23 +22,7 @@ If you'd rather not host your own copy, you can invite the official GroupCord bo
 
 </p>
 
----
-
-# ⭐ Recommended: Deploy Your Own GroupCord (Free)
-
-The easiest way to use GroupCord is by deploying your own copy using **Northflank**.
-
-✅ Free
-
-✅ Always online
-
-✅ No Node.js installation
-
-✅ No ngrok
-
-✅ No keeping your computer on
-
-⏱️ Average setup time: **10–15 minutes**
+> **Tip:** Right-click the button and choose **"Open Link in New Tab"** if you want to keep this page open while setting everything up.
 
 ---
 
@@ -44,107 +30,86 @@ The easiest way to use GroupCord is by deploying your own copy using **Northflan
 
 ## Discord → GroupMe
 
-- ✅ Text Messages
+- ✅ Messages
 - ✅ Images
 - ✅ Replies
-- ✅ Edit Notifications
-- ✅ Delete Notifications
+- ✅ Edit notifications
+- ✅ Delete notifications
 
 ## GroupMe → Discord
 
-- ✅ Text Messages
+- ✅ Messages
 - ✅ Images
 - ✅ Replies
-- ✅ User Avatars
+- ✅ User avatars
 - ✅ Usernames
 
 ## General
 
-- 🌉 Multiple Bridges
-- ⚡ Automatic Discord Webhooks
-- 💾 SQLite Database
-- ☁️ 24/7 Cloud Hosting
+- 🌉 Multiple bridges
+- ⚡ Automatic Discord webhooks
+- 💾 SQLite database
+- ☁️ Cloud hosted
+- 🚀 Fast setup
 - 🆓 Open Source
 
 ---
 
-# 🚀 Northflank Setup Guide
+# ⭐ Recommended Setup (Northflank)
 
-## Step 1 — Fork this Repository
+The easiest way to use GroupCord is by deploying your own copy to **Northflank**.
 
-Fork GroupCord to your GitHub account.
+### Benefits
 
-Or clone it if you prefer.
-
----
-
-## Step 2 — Create a Discord Bot
-
-Open the Discord Developer Portal.
-
-Create a new Application.
-
-Open the **Bot** page.
-
-Enable:
-
-- Message Content Intent
-
-Copy:
-
-- Bot Token
-- Client ID
-
-Next, open **OAuth2 → URL Generator**.
-
-Select:
-
-Scopes
-
-- bot
-- applications.commands
-
-Permissions
-
-- View Channels
-- Send Messages
-- Read Message History
-- Manage Webhooks
-
-Copy the generated invite URL.
+- ✅ Free
+- ✅ Always online
+- ✅ No Node.js installation
+- ✅ No ngrok
+- ✅ No keeping your computer on
+- ✅ Deploys in about 10 minutes
 
 ---
 
-## Step 3 — Create a GroupMe Bot
+# Step 1 — Fork this Repository
 
-Visit:
+Fork this repository to your own GitHub account.
+
+---
+
+# Step 2 — Create a GroupMe Bot
+
+Go to:
 
 https://dev.groupme.com/bots
 
 Create a bot inside your GroupMe group.
 
-Save:
+Save your:
 
 - GroupMe Bot ID
 - GroupMe Access Token
 
 ---
 
-## Step 4 — Create a Northflank Account
+# Step 3 — Create a Northflank Account
+
+Visit:
 
 https://northflank.com
 
-Sign in with GitHub.
+Sign in using GitHub.
 
 ---
 
-## Step 5 — Create a Project
+# Step 4 — Create a Project
 
 Click
 
 **New Project**
 
-Name it:
+Name it anything you'd like.
+
+Example:
 
 ```
 GroupCord
@@ -152,7 +117,9 @@ GroupCord
 
 ---
 
-## Step 6 — Create a Service
+# Step 5 — Create a Service
+
+Inside your project:
 
 Click
 
@@ -162,7 +129,7 @@ Choose
 
 **From Git Repository**
 
-Select your GitHub fork.
+Select your fork of GroupCord.
 
 Deployment Type:
 
@@ -170,16 +137,16 @@ Deployment Type:
 
 ---
 
-## Step 7 — Runtime Variables
+# Step 6 — Configure Runtime Variables
 
-Add the following Runtime Variables:
+Add these Runtime Variables:
 
 ```env
 DISCORD_TOKEN=YOUR_DISCORD_BOT_TOKEN
 
-CLIENT_ID=YOUR_DISCORD_CLIENT_ID
+CLIENT_ID=YOUR_DISCORD_APPLICATION_ID
 
-GUILD_ID=YOUR_TEST_SERVER_ID
+GUILD_ID=YOUR_DISCORD_SERVER_ID
 
 GROUPME_ACCESS_TOKEN=YOUR_GROUPME_ACCESS_TOKEN
 
@@ -190,25 +157,25 @@ PORT=3000
 
 ---
 
-## Step 8 — Networking
+# Step 7 — Configure Networking
 
-Expose one HTTP port:
+Expose one public HTTP port:
 
 ```
 3000
 ```
 
-Leave everything else as the default.
+Leave all other settings as their defaults.
 
 ---
 
-## Step 9 — Deploy
+# Step 8 — Deploy
 
 Click
 
 **Create Service**
 
-Wait until the logs show:
+Wait until the logs say:
 
 ```
 🚀 GroupCord is online!
@@ -216,19 +183,19 @@ Wait until the logs show:
 
 ---
 
-## Step 10 — Copy Your Northflank URL
+# Step 9 — Copy Your Northflank URL
 
-Northflank will generate a public URL similar to:
+Northflank will generate a URL similar to:
 
 ```
 https://groupcord-xxxxx.code.run
 ```
 
-Copy it.
+Copy this URL.
 
 ---
 
-## Step 11 — Configure the GroupMe Callback
+# Step 10 — Configure the GroupMe Callback
 
 Return to
 
@@ -248,34 +215,34 @@ Example:
 https://groupcord-abc123.code.run/webhook/groupme/325cf6495ff62383cae340bec9
 ```
 
-Save the changes.
+Save your changes.
 
 ---
 
-## Step 12 — Invite Your Discord Bot
+# Step 11 — Invite Your Bot
 
-Use the invite URL you generated earlier.
+Invite your Discord bot to your server.
 
-Invite the bot to your Discord server.
+Or use the official hosted GroupCord bot above.
 
 ---
 
-## Step 13 — Create Your Bridge
+# Step 12 — Create Your First Bridge
 
-Run
+Run:
 
 ```
 /setup
 ```
 
-Choose
+Select:
 
 - Discord Channel
 - GroupMe Bot ID
 
-Done!
+That's it!
 
-Your bridge is now live.
+Your Discord server and GroupMe group are now connected.
 
 ---
 
@@ -284,34 +251,41 @@ Your bridge is now live.
 | Command | Description |
 |----------|-------------|
 | `/setup` | Create or update a bridge |
-| `/bridges` | List configured bridges |
+| `/bridges` | List all bridges |
 | `/unlink` | Remove a bridge |
 | `/status` | View bridge status |
-| `/ping` | Verify the bot is online |
+| `/ping` | Test if the bot is online |
 
 ---
 
-# How GroupCord Works
+# Project Structure
 
 ```
-Discord
-     │
-     ▼
-Discord Gateway
-     │
 GroupCord
-     │
-Express Web Server
-     │
-     ▼
-GroupMe Webhook
+│
+├── src
+│   ├── commands
+│   ├── config
+│   ├── database
+│   ├── discord
+│   ├── groupme
+│   ├── util
+│   ├── web
+│   └── index.js
+│
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── ROADMAP.md
+├── README.md
+└── package.json
 ```
 
 ---
 
 # Local Development
 
-This section is only for developers contributing to GroupCord.
+Only needed if you want to contribute to GroupCord.
 
 Clone the repository:
 
@@ -327,31 +301,31 @@ npm install
 
 Copy the environment file:
 
-Windows:
+Windows
 
 ```cmd
 copy .env.example .env
 ```
 
-Linux/macOS:
+Linux/macOS
 
 ```bash
 cp .env.example .env
 ```
 
-Run GroupCord:
+Run:
 
 ```bash
 npm start
 ```
 
-Expose port 3000 with ngrok:
+If testing locally, expose port 3000 with ngrok:
 
 ```bash
 ngrok http 3000
 ```
 
-Update your GroupMe callback URL to the ngrok URL.
+Then update your GroupMe callback URL.
 
 ---
 
@@ -361,20 +335,20 @@ Upcoming features:
 
 - 🌐 Web Dashboard
 - 🐳 Docker Support
-- 📈 Analytics
+- 📈 Bridge Analytics
 - 😀 Better Emoji Support
-- 📁 Additional File Support
-- 🗳️ Voting System
+- 📁 Additional Attachment Support
 - ☁️ PostgreSQL
 - 🔐 Discord OAuth
+- 🗳️ Voting System
 
-See **ROADMAP.md** for more information.
+See **ROADMAP.md** for the full roadmap.
 
 ---
 
 # Contributing
 
-Contributions are welcome.
+Contributions are always welcome.
 
 Please read:
 
@@ -382,7 +356,7 @@ Please read:
 CONTRIBUTING.md
 ```
 
-before submitting a Pull Request.
+before opening a Pull Request.
 
 ---
 
@@ -400,13 +374,13 @@ LICENSE
 
 # Screenshots
 
-Coming soon.
+Coming Soon
 
 - Discord → GroupMe
 - GroupMe → Discord
-- Images
 - Replies
-- Dashboard
+- Images
+- Web Dashboard
 
 ---
 
