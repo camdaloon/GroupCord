@@ -1,269 +1,368 @@
 # GroupCord
 
-**GroupCord** is an open-source, two-way bridge between Discord and GroupMe.
+> **An open-source, two-way bridge between Discord and GroupMe.**
 
-Messages, images, replies, usernames, and profile pictures can be synchronized between a Discord channel and a GroupMe group.
+GroupCord keeps Discord and GroupMe conversations synchronized with support for text, images, replies, usernames, avatars, and more.
 
-> Current version: **v0.3.0**
+---
 
-## Features
+## ✨ Features
 
-- Discord → GroupMe message forwarding
-- GroupMe → Discord message forwarding
-- Images in both directions
-- Replies in both directions
-- Discord edit notices in GroupMe
-- Discord deletion notices in GroupMe
-- Native GroupMe usernames and profile pictures in Discord
-- Standard Unicode emoji support
-- Discord custom emoji links
-- Multiple Discord servers and channels
-- SQLite bridge configuration
-- Automatic Discord webhook creation
-- Bridge health checks
-- Slash-command configuration
-- Loop prevention
+- 🔄 Two-way message syncing
+- 🖼️ Images in both directions
+- 💬 Replies in both directions
+- ✏️ Discord edit notifications
+- 🗑️ Discord delete notifications
+- 👤 Native GroupMe usernames in Discord
+- 🖼️ Native GroupMe avatars in Discord
+- 🌉 Multiple bridges
+- ⚡ Automatic Discord webhook creation
+- 📊 Bridge health monitoring
+- 💾 SQLite database
+- ☁️ Permanent cloud hosting with Northflank
+- 🆓 Open Source (MIT)
 
-## Commands
+---
 
-| Command | Description |
-|---|---|
-| `/setup` | Connect a Discord channel to a GroupMe bot |
-| `/bridges` | List configured bridges |
-| `/unlink` | Remove a bridge |
-| `/status` | Check GroupCord and bridge health |
-| `/ping` | Check whether the bot is online |
+# Quick Start (Recommended)
 
-Administrative commands require the **Manage Server** permission.
+Estimated setup time:
 
-## How GroupCord Works
+**10–15 minutes**
 
-```text
-Discord
-   ⇅
-GroupCord
-   ⇅
-GroupMe
-```
+Requirements:
 
-Discord messages are received through the Discord Gateway.
+- GitHub account
+- Discord Bot
+- GroupMe Bot
+- GroupMe Access Token
+- Northflank account
 
-GroupMe messages are received through a callback webhook handled by GroupCord's Express web server.
+---
 
-Bridge settings are stored in a local SQLite database.
-
-## Requirements
-
-- Node.js 20 or newer
-- npm
-- A Discord application and bot
-- A GroupMe bot
-- A GroupMe access token
-- A publicly reachable HTTPS callback URL
-- Discord permissions:
-  - View Channels
-  - Send Messages
-  - Read Message History
-  - Manage Webhooks
-
-## Installation
-
-Clone the repository:
+# 1. Clone the Repository
 
 ```bash
 git clone https://github.com/camdaloon/GroupCord.git
 cd GroupCord
 ```
 
-Install dependencies:
+---
+
+# 2. Create a Discord Bot
+
+1. Go to the Discord Developer Portal.
+2. Create an application.
+3. Create a Bot.
+4. Enable:
+
+- Message Content Intent
+
+Invite the bot using the scopes:
+
+- bot
+- applications.commands
+
+Permissions:
+
+- View Channels
+- Send Messages
+- Read Message History
+- Manage Webhooks
+
+---
+
+# 3. Create a GroupMe Bot
+
+Visit:
+
+https://dev.groupme.com/bots
+
+Create a bot for your GroupMe group.
+
+Save:
+
+- Bot ID
+- GroupMe Access Token
+
+---
+
+# 4. Deploy to Northflank
+
+Create a new project.
+
+Create a Service.
+
+Connect your GitHub repository.
+
+Use the default Buildpack deployment.
+
+Runtime variables:
+
+```env
+DISCORD_TOKEN=YOUR_DISCORD_BOT_TOKEN
+CLIENT_ID=YOUR_APPLICATION_ID
+GUILD_ID=YOUR_TEST_SERVER_ID
+
+GROUPME_BOT_ID=YOUR_GROUPME_BOT_ID
+GROUPME_ACCESS_TOKEN=YOUR_GROUPME_ACCESS_TOKEN
+
+PORT=3000
+```
+
+Deploy.
+
+When the logs show:
+
+```text
+🚀 GroupCord is online!
+```
+
+your bot is running.
+
+---
+
+# 5. Configure GroupMe
+
+Set your callback URL to:
+
+```
+https://YOUR-NORTHFLANK-DOMAIN/webhook/groupme/YOUR_GROUPME_BOT_ID
+```
+
+Example:
+
+```
+https://groupcord-abc123.code.run/webhook/groupme/325cf6495ff62383cae340bec9
+```
+
+---
+
+# 6. Invite the Discord Bot
+
+Invite the bot to your server.
+
+Run:
+
+```
+/setup
+```
+
+Choose:
+
+- Discord channel
+- GroupMe Bot ID
+
+Done!
+
+Your bridge is now live.
+
+---
+
+# Commands
+
+| Command | Description |
+|----------|-------------|
+| `/setup` | Create or update a bridge |
+| `/bridges` | List configured bridges |
+| `/unlink` | Remove a bridge |
+| `/status` | Check bridge health |
+| `/ping` | Verify the bot is online |
+
+---
+
+# How It Works
+
+```
+Discord
+     │
+     ▼
+ Discord Gateway
+     │
+ GroupCord
+     │
+ Express Web Server
+     │
+     ▼
+ GroupMe Callback
+```
+
+Bridge settings are stored in SQLite.
+
+---
+
+# Current Features
+
+## Discord → GroupMe
+
+- Text
+- Images
+- Replies
+- Edit notifications
+- Delete notifications
+
+## GroupMe → Discord
+
+- Text
+- Images
+- Replies
+- Usernames
+- Avatars
+
+---
+
+# Local Development
+
+Clone:
+
+```bash
+git clone https://github.com/camdaloon/GroupCord.git
+```
+
+Install:
 
 ```bash
 npm install
 ```
 
-Copy the environment template:
-
-### Windows Command Prompt
-
-```cmd
-copy .env.example .env
-```
-
-### PowerShell, macOS, or Linux
+Copy:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and add your credentials.
+Windows:
 
-Start GroupCord:
+```cmd
+copy .env.example .env
+```
+
+Run:
 
 ```bash
 npm start
 ```
 
-For development with automatic restarting:
-
-```bash
-npm run dev
-```
-
-## Environment Variables
-
-```env
-DISCORD_TOKEN=
-CLIENT_ID=
-GUILD_ID=
-
-GROUPME_BOT_ID=
-GROUPME_ACCESS_TOKEN=
-
-PORT=3000
-```
-
-| Variable | Purpose |
-|---|---|
-| `DISCORD_TOKEN` | Discord bot token |
-| `CLIENT_ID` | Discord application ID |
-| `GUILD_ID` | Development Discord server ID |
-| `GROUPME_BOT_ID` | Default GroupMe bot ID used during development |
-| `GROUPME_ACCESS_TOKEN` | GroupMe account access token used for image uploads |
-| `PORT` | Express web-server port |
-
-Never commit `.env` or expose any token publicly.
-
-## Discord Setup
-
-1. Open the Discord Developer Portal.
-2. Create an application named **GroupCord**.
-3. Create a bot for the application.
-4. Enable **Message Content Intent**.
-5. Invite the bot with these scopes:
-   - `bot`
-   - `applications.commands`
-6. Grant:
-   - View Channels
-   - Send Messages
-   - Read Message History
-   - Manage Webhooks
-
-## GroupMe Setup
-
-1. Open the GroupMe developer website.
-2. Create a bot for the GroupMe group.
-3. Copy its Bot ID.
-4. Start GroupCord and expose port `3000` through a public HTTPS URL.
-5. Set the GroupMe bot callback URL to:
-
-```text
-https://YOUR-PUBLIC-DOMAIN/webhook/groupme/YOUR_GROUPME_BOT_ID
-```
-
-For local development, a temporary tunnel such as ngrok can be used:
+For local development, expose port 3000:
 
 ```bash
 ngrok http 3000
 ```
 
-The temporary URL may change whenever the tunnel restarts.
+Update the GroupMe callback URL to the ngrok URL.
 
-## Creating a Bridge
+---
 
-Run `/setup` in Discord.
+# Environment Variables
 
-Select:
+```env
+DISCORD_TOKEN=
 
-- The Discord text channel
-- The GroupMe Bot ID
+CLIENT_ID=
 
-GroupCord will:
+GUILD_ID=
 
-1. Create or reuse a Discord webhook.
-2. Store the bridge in SQLite.
-3. Route messages in both directions.
-4. Preserve GroupMe usernames and avatars in Discord.
+GROUPME_BOT_ID=
 
-## Data Files
+GROUPME_ACCESS_TOKEN=
 
-GroupCord creates these files locally:
-
-```text
-groupcord.sqlite
-groupcord.sqlite-shm
-groupcord.sqlite-wal
+PORT=3000
 ```
 
-They contain bridge configuration and message metadata. They are excluded from Git.
+---
 
-## Current Limitations
+# Project Structure
 
-- GroupMe does not provide reliable callback events for message edits or deletions.
-- Discord edits and deletions are sent to GroupMe as notices rather than modifying the original mirrored message.
-- Replies are displayed as quoted context rather than native cross-platform replies.
-- Some non-image GroupMe attachments may be forwarded as links.
-- Discord custom server emojis are forwarded as names and CDN links.
-- Local development requires a tunnel or publicly reachable server.
-
-## Security
-
-Never commit or publish:
-
-- `.env`
-- Discord bot tokens
-- GroupMe access tokens
-- Discord webhook tokens
-- SQLite database files
-
-Reset a token immediately if it is accidentally exposed.
-
-To report a security issue, avoid opening a public issue containing credentials or sensitive information.
-
-## Project Structure
-
-```text
-GroupCord/
-├── src/
-│   ├── commands/
-│   ├── config/
-│   ├── database/
-│   ├── discord/
-│   │   └── events/
-│   ├── groupme/
-│   ├── util/
-│   ├── web/
+```
+GroupCord
+│
+├── src
+│   ├── commands
+│   ├── config
+│   ├── database
+│   ├── discord
+│   ├── groupme
+│   ├── util
+│   ├── web
 │   └── index.js
-├── .env.example
-├── .gitignore
+│
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE
-├── README.md
 ├── ROADMAP.md
-├── package-lock.json
-└── package.json
+├── README.md
+├── package.json
+└── .env.example
 ```
 
-## Roadmap
+---
 
-See [ROADMAP.md](ROADMAP.md).
+# Roadmap
 
-Planned work includes:
+Upcoming features include:
 
-- Better file forwarding
-- Improved custom emoji handling
-- Docker support
-- PostgreSQL support
-- Web dashboard
-- Discord login
-- Easier GroupMe linking
-- Public hosted version
-- Voting and bill-management features
+- 🌐 Web Dashboard
+- 🐳 Docker Support
+- 🗳️ Voting System
+- 📁 Better File Support
+- 😀 Improved Emoji Support
+- ☁️ PostgreSQL
+- 🔐 Discord OAuth
+- 📈 Bridge Analytics
+- 🚀 Public Hosted Version
 
-## Contributing
+See **ROADMAP.md** for the complete roadmap.
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+---
 
-## License
+# Contributing
 
-GroupCord is released under the [MIT License](LICENSE).
+Contributions are welcome.
+
+Please read:
+
+```
+CONTRIBUTING.md
+```
+
+before opening a Pull Request.
+
+---
+
+# License
+
+GroupCord is licensed under the MIT License.
+
+See:
+
+```
+LICENSE
+```
+
+---
+
+# Screenshots
+
+*(Coming Soon)*
+
+- Dashboard
+- Discord → GroupMe
+- GroupMe → Discord
+- Replies
+- Images
+
+---
+
+# Built With
+
+- Node.js
+- discord.js
+- Express
+- better-sqlite3
+- Axios
+- Winston
+- Northflank
+
+---
+
+Made by camdaloon
