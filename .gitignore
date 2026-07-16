@@ -1,7 +1,6 @@
 node_modules/
 .env
-.env.*
+groupcord.sqlite
+groupcord.sqlite-shm
+groupcord.sqlite-wal
 *.log
-
-.vscode/
-.DS_Store
