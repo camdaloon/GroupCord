@@ -1,8 +1,24 @@
+const fs = require("node:fs");
 const path = require("node:path");
 const Database = require("better-sqlite3");
 
-const databasePath = path.join(process.cwd(), "groupcord.sqlite");
+// Northflank will mount persistent storage at /data.
+// Locally, GroupCord continues using the project folder.
+const dataDirectory =
+  process.env.DATA_DIR || process.cwd();
+
+fs.mkdirSync(dataDirectory, {
+  recursive: true,
+});
+
+const databasePath = path.join(
+  dataDirectory,
+  "groupcord.sqlite"
+);
+
 const database = new Database(databasePath);
+
+console.log(`🗄️ Database location: ${databasePath}`);
 
 database.pragma("journal_mode = WAL");
 
